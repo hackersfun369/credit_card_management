@@ -30,3 +30,5 @@ eureka:
       defaultZone: http://localhost:4596/eureka/
     register-with-eureka: true
     fetch-registry: true
+CLINE_API_KEY: ${CLINE_API_KEY:}
+CLINE_MODEL: ${CLINE_MODEL:minimax/minimax-m2.5}

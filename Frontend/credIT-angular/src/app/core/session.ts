@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
-export interface SessionUser { username: string; role: string; expiresAt: string; }
+export interface SessionUser { username: string; role: string; expiresAt: string; customerId?: number|string; }
 
 @Injectable({ providedIn: 'root' })
 export class Session {
@@ -26,7 +26,7 @@ export class Session {
     if(!token)throw new Error('The sign-in service did not return an access token.');
     localStorage.setItem('credit-token',token);
     if(response?.refreshToken)localStorage.setItem('credit-refresh-token',response.refreshToken);
-    localStorage.setItem('credit-user',JSON.stringify({username:response?.username||this.payload(token)?.sub||'Admin Manager',role:response?.role||'ADMIN',expiresAt:response?.expiresAt||''}));
+    localStorage.setItem('credit-user',JSON.stringify({username:response?.username||this.payload(token)?.sub||'Admin Manager',role:response?.role||'MANAGER',customerId:response?.customerId||this.payload(token)?.customerId,expiresAt:response?.expiresAt||''}));
     this.scheduleExpiry();
   }
 

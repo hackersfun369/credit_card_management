@@ -1,0 +1,1 @@
+package com.project;import java.util.List;import org.springframework.data.jpa.repository.JpaRepository;public interface CardRequestRepository extends JpaRepository<CardRequest,Long>{List<CardRequest> findByCustomerIdOrderByIdDesc(Integer customerId);}

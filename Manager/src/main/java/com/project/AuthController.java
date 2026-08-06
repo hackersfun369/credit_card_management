@@ -1,100 +1,16 @@
 package com.project;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Map;
-
-import javax.crypto.SecretKey;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RestController;
-
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-
-@CrossOrigin(origins = {
-	    "http://localhost:4200",
-	    "http://localhost:5173"
-	})
-
-@RestController
-@RequestMapping("/api/auth")
+import java.time.*;import java.util.Map;import javax.crypto.SecretKey;import org.springframework.beans.factory.annotation.Value;import org.springframework.http.*;import org.springframework.security.crypto.password.PasswordEncoder;import org.springframework.web.bind.annotation.*;import io.jsonwebtoken.*;import io.jsonwebtoken.security.Keys;
+@CrossOrigin(origins={"http://localhost:4200","http://localhost:5173"}) @RestController @RequestMapping("/api/auth")
 public class AuthController {
-    private final ManagerRepository managers;
-    private final PasswordEncoder passwords;
-    private final SecretKey key;
-    private final long expirationMinutes;
-    private static final long REFRESH_EXPIRATION_DAYS = 7;
-
-    public AuthController(ManagerRepository managers, PasswordEncoder passwords,
-            @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-minutes}") long expirationMinutes) {
-        this.managers = managers; this.passwords = passwords;
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        this.expirationMinutes = expirationMinutes;
-    }
-
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        String username = request.username() == null ? "" : request.username().trim();
-        if (username.isBlank() || request.password() == null || request.password().length() < 8)
-            return ResponseEntity.badRequest().body(Map.of("message", "Username and an 8-character password are required."));
-        if (request.firstName() == null || request.firstName().isBlank() || request.lastName() == null || request.lastName().isBlank())
-            return ResponseEntity.badRequest().body(Map.of("message", "First name and last name are required."));
-        if (request.phoneNumber() == null || !String.valueOf(request.phoneNumber()).matches("\\d{10}"))
-            return ResponseEntity.badRequest().body(Map.of("message", "Phone number must contain exactly 10 digits."));
-        if (managers.existsByUsername(username)) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "A manager with this username already exists."));
-        if (managers.existsByPhoneNumber(request.phoneNumber())) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "A manager with this phone number already exists."));
-        Manager manager = new Manager(); manager.setUsername(username); manager.setPasswordHash(passwords.encode(request.password()));
-        manager.setFirstName(request.firstName().trim()); manager.setLastName(request.lastName().trim()); manager.setPhoneNumber(request.phoneNumber()); manager.setAddress(request.address()); manager.setStatus(STATUS.ACTIVE); manager.setRole("ADMIN");
-        managers.save(manager); return ResponseEntity.status(HttpStatus.CREATED).body(tokenResponse(manager));
-    }
-
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        String username = request.username() == null ? "" : request.username().trim();
-        if (username.isBlank() || request.password() == null || request.password().isBlank()) return ResponseEntity.badRequest().body(Map.of("message", "Username and password are required."));
-        return managers.findByUsername(username)
-            .<ResponseEntity<?>>map(manager -> {
-                if (manager.getStatus() != STATUS.ACTIVE) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "This manager account is inactive."));
-                if (!passwords.matches(request.password(), manager.getPasswordHash())) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Incorrect password."));
-                return ResponseEntity.ok(tokenResponse(manager));
-            })
-            .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "No manager with that username exists.")));
-    }
-    @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestHeader(value = "Authorization", required = false) String authorization) {
-        if (authorization == null || !authorization.startsWith("Bearer "))
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "A valid session token is required."));
-        try {
-            var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(authorization.substring(7)).getPayload();
-            String tokenUse = claims.get("tokenUse", String.class);
-            if (tokenUse != null && !"refresh".equals(tokenUse)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "A refresh token is required."));
-            String username = claims.getSubject();
-            return managers.findByUsername(username).filter(m -> m.getStatus() == STATUS.ACTIVE)
-                    .<ResponseEntity<?>>map(m -> ResponseEntity.ok(tokenResponse(m)))
-                    .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Manager account is unavailable.")));
-        } catch (Exception exception) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Your session has expired. Please sign in again."));
-        }
-    }
-    private Map<String, Object> tokenResponse(Manager manager) {
-        Instant expires = Instant.now().plus(expirationMinutes, ChronoUnit.MINUTES);
-        String token = Jwts.builder().subject(manager.getUsername()).claim("role", manager.getRole()).issuedAt(java.util.Date.from(Instant.now())).expiration(java.util.Date.from(expires)).signWith(key).compact();
-        return Map.of("accessToken", token, "refreshToken", refreshToken(manager), "tokenType", "Bearer", "expiresAt", expires.toString(), "username", manager.getUsername(), "role", manager.getRole());
-    }
-    private String refreshToken(Manager manager) {
-        Instant expires = Instant.now().plus(REFRESH_EXPIRATION_DAYS, ChronoUnit.DAYS);
-        return Jwts.builder().subject(manager.getUsername()).claim("tokenUse", "refresh").issuedAt(java.util.Date.from(Instant.now())).expiration(java.util.Date.from(expires)).signWith(key).compact();
-    }
-    public record LoginRequest(String username, String password) {}
-    public record RegisterRequest(String username, String password, String firstName, String lastName, Long phoneNumber, String address) {}
+private final ManagerRepository managers;private final CustomerAccountRepository customers;private final PasswordEncoder passwords;private final SecretKey key;private final long minutes;
+public AuthController(ManagerRepository m,CustomerAccountRepository c,PasswordEncoder p,@Value("${app.jwt.secret}") String secret,@Value("${app.jwt.expiration-minutes}") long min){managers=m;customers=c;passwords=p;key=Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));minutes=min;}
+@PostMapping("/register") public ResponseEntity<?> register(@RequestBody RegisterRequest r){String u=clean(r.username());if(u.isBlank()||r.password()==null||r.password().length()<8)return bad("Username and an 8-character password are required.");if(managers.existsByUsername(u)||customers.existsByUsername(u))return conflict("This username is already in use.");if(r.phoneNumber()==null||!String.valueOf(r.phoneNumber()).matches("\\d{10}"))return bad("Phone number must contain exactly 10 digits.");Manager x=new Manager();x.setUsername(u);x.setPasswordHash(passwords.encode(r.password()));x.setFirstName(clean(r.firstName()));x.setLastName(clean(r.lastName()));x.setPhoneNumber(r.phoneNumber());x.setAddress(r.address());x.setStatus(STATUS.ACTIVE);x.setRole("MANAGER");managers.save(x);return ResponseEntity.status(HttpStatus.CREATED).body(token(x.getUsername(),"MANAGER",null));}
+@PostMapping("/login") public ResponseEntity<?> login(@RequestBody LoginRequest r){String u=clean(r.username());if(u.isBlank()||clean(r.password()).isBlank())return bad("Username and password are required.");if("CUSTOMER".equalsIgnoreCase(r.loginAs()))return customers.findByUsername(u).<ResponseEntity<?>>map(a->{if(!a.isActive())return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message","This customer account is inactive."));if(!passwords.matches(r.password(),a.getPasswordHash()))return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message","Incorrect password."));return ResponseEntity.ok(token(a.getUsername(),"CUSTOMER",a.getCustomerId()));}).orElseGet(()->ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message","No customer with that username exists.")));return managers.findByUsername(u).<ResponseEntity<?>>map(m->{if(m.getStatus()!=STATUS.ACTIVE)return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message","This manager account is inactive."));if(!passwords.matches(r.password(),m.getPasswordHash()))return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message","Incorrect password."));return ResponseEntity.ok(token(m.getUsername(),"MANAGER",null));}).orElseGet(()->ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message","No manager with that username exists.")));}
+@PostMapping("/customers/{id}/credentials") public ResponseEntity<?> createCustomerCredentials(@RequestHeader("Authorization") String h,@PathVariable Integer id,@RequestBody CredentialRequest r){requireManager(h);String u=clean(r.username());if(u.isBlank()||r.password()==null||r.password().length()<8)return bad("Customer username and an 8-character password are required.");if(managers.existsByUsername(u)||customers.existsByUsername(u))return conflict("This username is already in use.");CustomerAccount a=new CustomerAccount();a.setCustomerId(id);a.setUsername(u);a.setPasswordHash(passwords.encode(r.password()));customers.save(a);return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message","Customer portal access created.","username",u));}
+@GetMapping("/customers/{id}/credentials") public ResponseEntity<?> getCustomerCredentials(@RequestHeader("Authorization") String h,@PathVariable Integer id){requireManager(h);return customers.findByCustomerId(id).<ResponseEntity<?>>map(a->ResponseEntity.ok(Map.of("configured",true,"customerId",id,"username",a.getUsername(),"active",a.isActive(),"passwordStoredSecurely",true))).orElseGet(()->ResponseEntity.ok(Map.of("configured",false,"customerId",id)));}
+@PutMapping("/customers/{id}/credentials") public ResponseEntity<?> updateCustomerCredentials(@RequestHeader("Authorization") String h,@PathVariable Integer id,@RequestBody CredentialRequest r){requireManager(h);CustomerAccount a=customers.findByCustomerId(id).orElseThrow(()->new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,"Customer portal access has not been created."));String u=clean(r.username());if(!u.isBlank()&&!u.equals(a.getUsername())&&(managers.existsByUsername(u)||customers.existsByUsername(u)))return conflict("This username is already in use.");if(!u.isBlank())a.setUsername(u);if(r.password()!=null&&!r.password().isBlank()){if(r.password().length()<8)return bad("Password must contain at least 8 characters.");a.setPasswordHash(passwords.encode(r.password()));}if(r.active()!=null)a.setActive(r.active());customers.save(a);return ResponseEntity.ok(Map.of("message","Customer portal access updated.","username",a.getUsername(),"active",a.isActive()));}
+@PostMapping("/refresh") public ResponseEntity<?> refresh(@RequestHeader(value="Authorization",required=false) String h){try{Claims c=claims(h);if(!"refresh".equals(c.get("tokenUse",String.class)))return unauth();if("CUSTOMER".equals(c.get("role",String.class)))return customers.findByUsername(c.getSubject()).filter(CustomerAccount::isActive).<ResponseEntity<?>>map(a->ResponseEntity.ok(token(a.getUsername(),"CUSTOMER",a.getCustomerId()))).orElseGet(this::unauth);return managers.findByUsername(c.getSubject()).filter(m->m.getStatus()==STATUS.ACTIVE).<ResponseEntity<?>>map(m->ResponseEntity.ok(token(m.getUsername(),"MANAGER",null))).orElseGet(this::unauth);}catch(Exception e){return unauth();}}
+private Map<String,Object> token(String u,String role,Integer cid){Instant exp=Instant.now().plus(minutes,java.time.temporal.ChronoUnit.MINUTES);JwtBuilder a=Jwts.builder().subject(u).claim("role",role).issuedAt(java.util.Date.from(Instant.now())).expiration(java.util.Date.from(exp));JwtBuilder r=Jwts.builder().subject(u).claim("role",role).claim("tokenUse","refresh").issuedAt(java.util.Date.from(Instant.now())).expiration(java.util.Date.from(Instant.now().plus(7,java.time.temporal.ChronoUnit.DAYS)));if(cid!=null){a.claim("customerId",cid);r.claim("customerId",cid);}return Map.of("accessToken",a.signWith(key).compact(),"refreshToken",r.signWith(key).compact(),"tokenType","Bearer","expiresAt",exp.toString(),"username",u,"role",role,"customerId",cid==null?"":cid);}
+private Claims claims(String h){if(h==null||!h.startsWith("Bearer "))throw new IllegalArgumentException();return Jwts.parser().verifyWith(key).build().parseSignedClaims(h.substring(7)).getPayload();}private void requireManager(String h){String role=claims(h).get("role",String.class);if(!"MANAGER".equals(role)&&!"ADMIN".equals(role))throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,"Manager access is required.");}private String clean(String s){return s==null?"":s.trim();}private ResponseEntity<?> bad(String s){return ResponseEntity.badRequest().body(Map.of("message",s));}private ResponseEntity<?> conflict(String s){return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message",s));}private ResponseEntity<?> unauth(){return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message","Your session has expired. Please sign in again."));}
+public record LoginRequest(String username,String password,String loginAs){} public record RegisterRequest(String username,String password,String firstName,String lastName,Long phoneNumber,String address){} public record CredentialRequest(String username,String password,Boolean active){}
 }

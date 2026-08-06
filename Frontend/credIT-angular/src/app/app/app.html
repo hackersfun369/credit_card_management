@@ -1,1 +1,1 @@
-@if(onAuthPage){<router-outlet></router-outlet>}@else{<app-shell><router-outlet></router-outlet></app-shell><app-assistant-chat></app-assistant-chat>}
+@if(onAuthPage){<router-outlet></router-outlet>}@else{<app-shell><router-outlet></router-outlet></app-shell>@if(session.user?.role!=='CUSTOMER'){<app-assistant-chat></app-assistant-chat>}}

@@ -21,6 +21,11 @@ export class CustomerDetail implements OnInit {
   deleteOpen = false;
   edit: any = {};
   editError = '';
+  portalOpen = false;
+  portalAccess: any = { configured: false };
+  portalForm = { username: '', password: '', active: true };
+  portalError = '';
+  temporaryPassword = '';
 
   constructor(private api: CreditApi, private route: ActivatedRoute, private router: Router, private cdr: ChangeDetectorRef) {}
 
@@ -62,6 +67,7 @@ export class CustomerDetail implements OnInit {
       this.customer = this.rows(customers).find((customer: any) => String(this.id(customer)) === String(customerId));
       this.cards = this.rows(cards).filter((card: any) => String(card?.customerId ?? card?.custId) === String(customerId));
       if (!this.customer) this.error = 'Customer not found.';
+      else await this.loadPortalAccess();
     } catch (error: any) { this.error = error?.message || 'Unable to load customer details.'; }
     finally { this.loading = false; this.cdr.detectChanges(); }
   }
@@ -90,5 +96,57 @@ export class CustomerDetail implements OnInit {
       this.deleteOpen = false; this.router.navigateByUrl('/customers');
     } catch (error: any) { this.deleteOpen = false; this.error = error?.message || 'Unable to delete customer.'; this.cdr.detectChanges(); }
   }
+  async loadPortalAccess() {
+    try {
+      this.portalAccess = await this.api.request<any>('auth', '/api/auth/customers/' + this.id(this.customer) + '/credentials');
+    } catch {
+      this.portalAccess = { configured: false };
+    }
+  }
+
+  openPortalAccess() {
+    this.portalForm = {
+      username: this.portalAccess?.username || '',
+      password: '',
+      active: this.portalAccess?.configured ? this.portalAccess.active !== false : true,
+    };
+    this.temporaryPassword = '';
+    this.portalError = '';
+    this.portalOpen = true;
+  }
+
+  closePortalAccess() {
+    this.portalOpen = false;
+    this.portalError = '';
+    this.temporaryPassword = '';
+  }
+
+  async savePortalAccess() {
+    this.portalError = '';
+    if (!this.portalForm.username.trim()) {
+      this.portalError = 'Username is required.';
+      return;
+    }
+    if (!this.portalAccess?.configured && this.portalForm.password.length < 8) {
+      this.portalError = 'A temporary password with at least 8 characters is required.';
+      return;
+    }
+    try {
+      const passwordUsed = this.portalForm.password;
+      await this.api.request('auth', '/api/auth/customers/' + this.id(this.customer) + '/credentials', {
+        method: this.portalAccess?.configured ? 'PUT' : 'POST',
+        body: JSON.stringify(this.portalForm),
+      });
+      this.temporaryPassword = passwordUsed;
+      await this.loadPortalAccess();
+      this.notice = 'Customer portal access saved.';
+      this.clearNotice();
+    } catch (error: any) {
+      this.portalError = error?.message || 'Unable to save customer portal access.';
+    } finally {
+      this.cdr.detectChanges();
+    }
+  }
+
   clearNotice() { window.setTimeout(() => { this.notice = ''; this.cdr.detectChanges(); }, 3000); }
 }

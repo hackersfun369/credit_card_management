@@ -1,0 +1,4 @@
+package com.project;
+import jakarta.persistence.*;
+@Entity @Table(name="CUSTOMER_ACCOUNT",uniqueConstraints={@UniqueConstraint(columnNames="CUSTOMER_ID"),@UniqueConstraint(columnNames="USERNAME")})
+public class CustomerAccount{@Id @GeneratedValue(strategy=GenerationType.IDENTITY)private Long id;@Column(name="CUSTOMER_ID",nullable=false)private Integer customerId;@Column(nullable=false)private String username;@Column(nullable=false)private String passwordHash;@Column(nullable=false)private boolean active=true;public Integer getCustomerId(){return customerId;}public void setCustomerId(Integer v){customerId=v;}public String getUsername(){return username;}public void setUsername(String v){username=v;}public String getPasswordHash(){return passwordHash;}public void setPasswordHash(String v){passwordHash=v;}public boolean isActive(){return active;}public void setActive(boolean v){active=v;}}

@@ -35,12 +35,13 @@ export class CardDetail implements OnInit, OnDestroy {
   renew = { expiryDate: '', dueDate: '' };
   renewError = '';
   private refreshTimer?: number;
+  readonly customerMode: boolean;
   constructor(
     private api: CreditApi,
     private route: ActivatedRoute,
     private router: Router,
     private cdr: ChangeDetectorRef,
-  ) {}
+  ) { this.customerMode = this.router.url.startsWith('/my-account'); }
   ngOnInit() {
     this.load();
     this.refreshTimer = window.setInterval(() => this.load(), 15000);
@@ -52,32 +53,57 @@ export class CardDetail implements OnInit, OnDestroy {
     this.loading = true;
     try {
       const id = this.route.snapshot.paramMap.get('id');
-      const [cards, customers, merchants, transactions] = await Promise.all([
-        this.api.request<any>('cards', '/card'),
-        this.api.request<any>('customers', '/customer'),
-        this.api.request<any>('merchants', '/merchants'),
-        this.api.request<any>('transactions', '/transactions'),
-      ]);
-      const rows = (x: any) => (Array.isArray(x) ? x : x?.content || []);
-      const all = rows(cards);
-      this.allCards = all;
-      this.card = all.find((c: any) => String(this.id(c)) === String(id));
-      this.customers = rows(customers);
-      this.merchants = rows(merchants);
-      this.allTransactions = rows(transactions);
-      this.transactions = this.allTransactions.filter(
-        (t: any) =>
-          this.same(t?.cardNumber, this.card?.cardNumber) ||
-          String(t?.creditId ?? t?.cardId ?? '') === String(id),
-      );
-    } catch (e: any) {
-      this.error = e?.message || 'Unable to load this card.';
+      if (this.customerMode) {
+        const portal: any = await this.api.request('auth', '/api/customer-portal/dashboard');
+        const cards = Array.isArray(portal?.cards) ? portal.cards : [];
+        const transactions = Array.isArray(portal?.transactions) ? portal.transactions : [];
+        this.allCards = cards;
+        this.card = cards.find((item: any) => String(this.id(item)) === String(id));
+        this.customers = portal?.customer ? [portal.customer] : [];
+        this.allTransactions = transactions;
+        this.transactions = transactions.filter((transaction: any) =>
+          this.same(transaction?.cardNumber, this.card?.cardNumber) ||
+          String(transaction?.creditId ?? transaction?.cardId ?? '') === String(id),
+        );
+        const merchantMap = new Map<string, any>();
+        for (const transaction of this.transactions) {
+          if (String(transaction?.transactionType || '').toUpperCase() === 'PAYMENT') continue;
+          const merchantId = transaction?.merchantId ?? transaction?.merchantName;
+          if (merchantId == null) continue;
+          const key = String(merchantId);
+          if (!merchantMap.has(key)) merchantMap.set(key, {
+            merchantId: transaction?.merchantId,
+            merchantName: transaction?.merchantName || 'Merchant',
+            merchantCategory: transaction?.merchantCategory || 'CARD TRANSACTION',
+          });
+        }
+        this.merchants = [...merchantMap.values()];
+      } else {
+        const [cards, customers, merchants, transactions] = await Promise.all([
+          this.api.request<any>('cards', '/card'),
+          this.api.request<any>('customers', '/customer'),
+          this.api.request<any>('merchants', '/merchants'),
+          this.api.request<any>('transactions', '/transactions'),
+        ]);
+        const rows = (value: any) => (Array.isArray(value) ? value : value?.content || []);
+        const all = rows(cards);
+        this.allCards = all;
+        this.card = all.find((item: any) => String(this.id(item)) === String(id));
+        this.customers = rows(customers);
+        this.merchants = rows(merchants);
+        this.allTransactions = rows(transactions);
+        this.transactions = this.allTransactions.filter((transaction: any) =>
+          this.same(transaction?.cardNumber, this.card?.cardNumber) ||
+          String(transaction?.creditId ?? transaction?.cardId ?? '') === String(id),
+        );
+      }
+    } catch (error: any) {
+      this.error = error?.message || 'Unable to load this card.';
     } finally {
       this.loading = false;
       this.cdr.detectChanges();
     }
-  }
-  id(x: any) {
+  }  id(x: any) {
     return x?.creditId ?? x?.id;
   }
   same(a: any, b: any) {
@@ -207,18 +233,19 @@ export class CardDetail implements OnInit, OnDestroy {
   }
   merchantId(m: any) { return String(m?.merchantId ?? m?.id ?? ''); }
   selectMerchant(merchant: any) { const id = this.merchantId(merchant); this.selectedMerchantId = this.selectedMerchantId === id ? null : id; this.historyPage = 1; }
-  navMerchant(merchant: any) { this.nav('/merchants/' + this.merchantId(merchant)); }
+  navMerchant(merchant: any) { this.nav((this.customerMode ? '/my-account/merchants/' : '/merchants/') + this.merchantId(merchant)); }
   merchantName(m: any) {
     return [m?.firstName, m?.lastName].filter(Boolean).join(' ') || m?.merchantName || 'Merchant';
   }
   nav(path: string) {
     this.router.navigateByUrl(path);
   }
+  openTransaction(transaction: any) { this.nav((this.customerMode ? '/my-account/transactions/' : '/transactions/') + (transaction?.transactionId ?? transaction?.id)); }
   outstandingBalance() {
     return Math.max(0, this.limit() - this.available());
   }
   linkedCard(id: any) { return this.allCards.find(card => String(this.id(card)) === String(id)); }
-  canRenew() { const remaining = this.days(this.card?.expiryDate); return remaining !== null && remaining <= 30 && this.card?.replacedByCreditId == null; }
+  canRenew() { const remaining = this.days(this.card?.expiryDate); return remaining !== null && (this.customerMode ? remaining < 0 : remaining <= 30) && this.card?.replacedByCreditId == null; }
   isExpired() { const remaining = this.days(this.card?.expiryDate); return remaining !== null && remaining < 0; }
   todayInput() { return new Date().toISOString().slice(0, 10); }
   minimumRenewalExpiry() {
@@ -247,14 +274,25 @@ export class CardDetail implements OnInit, OnDestroy {
     if (!this.renew.expiryDate || !this.renew.dueDate) { this.renewError = 'Enter the renewed expiry and due dates.'; return; }
     if (new Date(this.renew.dueDate) >= new Date(this.renew.expiryDate)) { this.renewError = 'Due date must be before expiry date.'; return; }
     try {
-      const renewed: any = await this.api.request('cards', `/cards/${this.id(this.card)}/renew`, { method: 'POST', body: JSON.stringify(this.renew) });
+      const renewed: any = await this.api.request(this.customerMode ? 'auth' : 'cards', this.customerMode ? `/api/customer-portal/cards/${this.id(this.card)}/renew` : `/cards/${this.id(this.card)}/renew`, { method: 'POST', body: JSON.stringify(this.renew) });
       const replacement = (Array.isArray(renewed) ? renewed : []).find(card => String(card?.cardType) === String(this.card?.cardType)) || renewed?.[0];
       this.closeRenew();
-      if (replacement) this.nav(`/cards/${this.id(replacement)}`);
+      if (replacement) this.nav(`${this.customerMode ? '/my-account/cards/' : '/cards/'}${this.id(replacement)}`);
       else { this.notice = 'Card renewal completed.'; await this.load(); }
     } catch (error: any) { this.renewError = error?.message || 'Unable to renew this card.'; }
     finally { this.cdr.detectChanges(); }
-  }  openRepay() { if (this.card?.replacedByCreditId != null) { this.error = 'This physical card was replaced. Open the replacement card to repay the shared balance.'; return; } this.repayError = ''; this.repayAmount = null; this.repayOpen = true; }
+  }
+  async blockCustomerCard() {
+    if (!this.customerMode || !this.card || this.status(this.card) !== 'ACTIVE') return;
+    try {
+      await this.api.request('auth', `/api/customer-portal/cards/${this.id(this.card)}/block`, { method: 'POST' });
+      this.card = { ...this.card, status: 'BLOCKED', cardStatus: 'BLOCKED' };
+      this.notice = 'Card blocked immediately. New transactions are disabled.';
+    } catch (error: any) {
+      this.error = error?.message || 'Unable to block this card.';
+    } finally { this.cdr.detectChanges(); }
+  }
+  openRepay() { if (this.card?.replacedByCreditId != null) { this.error = 'This physical card was replaced. Open the replacement card to repay the shared balance.'; return; } this.repayError = ''; this.repayAmount = null; this.repayOpen = true; }
   closeRepay() { this.repayOpen = false; this.repayError = ''; }
   async saveRepay() {
     const amount = Number(this.repayAmount || 0);

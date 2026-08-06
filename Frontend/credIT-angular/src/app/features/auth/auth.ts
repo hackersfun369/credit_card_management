@@ -15,7 +15,7 @@ export class Auth {
   mode: 'login' | 'register' = 'login';
   loading = false;
   error = '';
-  login = { username: '', password: '' };
+  login = { username: '', password: '', loginAs: 'MANAGER' };
   register = { username: '', password: '', firstName: '', lastName: '', phoneNumber: '', address: '' };
 
   switchMode(mode: 'login' | 'register') {
@@ -42,7 +42,7 @@ export class Auth {
         }),
       });
       this.session.save(response);
-      await this.router.navigateByUrl(this.route.snapshot.queryParamMap.get('returnUrl') || '/');
+      await this.router.navigateByUrl(this.route.snapshot.queryParamMap.get('returnUrl') || (response?.role === 'CUSTOMER' ? '/my-account' : '/'));
     } catch (error: any) {
       this.error = error?.message || 'Unable to sign in.';
     } finally {
