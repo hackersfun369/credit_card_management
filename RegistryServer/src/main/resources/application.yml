@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: RegistryServer
+
+server:
+  port: 4596
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    fetch-registry: false
+    register-with-eureka: false
+# http://localhost:4596/

@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: Manager
+  datasource:
+    url: jdbc:oracle:thin:@//localhost:1521/freepdb1
+    username: ${DB_USERNAME:system}
+    password: ${DB_PASSWORD}
+    driver-class-name: oracle.jdbc.OracleDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8085
+
+app:
+  jwt:
+    # Set APP_JWT_SECRET in the deployment environment; this is a development fallback only.
+    secret: ${APP_JWT_SECRET:replace-this-development-secret-with-a-32-byte-minimum-key}
+    expiration-minutes: 120
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:4596/eureka/
+    register-with-eureka: true
+    fetch-registry: true

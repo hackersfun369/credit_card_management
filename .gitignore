@@ -1,0 +1,27 @@
+# Local IDE and Eclipse metadata
+.metadata/
+.vscode/
+.project
+.classpath
+.settings/
+
+# Java / Maven build output
+**/target/
+**/*.log
+
+# JavaScript / Angular output and local caches
+**/node_modules/
+**/dist/
+**/.angular/
+**/.cache/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+application-local.properties
+
+# React reference project is intentionally not part of this Angular repository
+Frontend/credIT/

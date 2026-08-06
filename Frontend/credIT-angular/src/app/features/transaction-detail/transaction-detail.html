@@ -1,0 +1,94 @@
+@if (loading) {
+  <div class="empty">Loading transaction...</div>
+} @else if (!transaction) {
+  <div class="empty">Transaction not found.</div>
+} @else {
+  <section class="transaction-hero" [class.repayment-hero]="isRepayment()">
+    <div class="hero-copy">
+      <p class="eyebrow">TRANSACTION DETAILS</p>
+      <div class="hero-title">
+        <span class="transaction-icon">{{ isRepayment() ? '↙' : '↗' }}</span>
+        <div>
+          <h1>{{ title() }}</h1>
+          <p>{{ subtitle() }}</p>
+        </div>
+      </div>
+    </div>
+    <span class="status-pill" [class]="'status-' + status(transaction).toLowerCase()">{{ status(transaction) }}</span>
+  </section>
+
+  @if (notice) { <div class="notice">{{ notice }}</div> }
+  @if (error) { <div class="notice error">{{ error }}</div> }
+
+  <section class="metric-grid">
+    <article class="metric amount-metric" [class.repayment-metric]="isRepayment()">
+      <p>Amount</p>
+      <h2>{{ money(amount(transaction)) }}</h2>
+      <small>{{ isRepayment() ? 'Credit restored to the shared card account' : (transaction.currency || 'INR') }}</small>
+    </article>
+    <article class="metric">
+      <p>Transaction type</p>
+      <h2>{{ isRepayment() ? 'DEBT REPAYMENT' : type(transaction) }}</h2>
+      <small>Payment method: {{ transaction.paymentMethod || '-' }}</small>
+    </article>
+    <article class="metric">
+      <p>Reference</p>
+      <h2>#{{ id(transaction) }}</h2>
+      <small>Transaction ID: {{ id(transaction) }}</small>
+    </article>
+    <article class="metric">
+      <p>Date &amp; time</p>
+      <h2>{{ date(transaction.timestamp) }}</h2>
+      <small>India time</small>
+    </article>
+  </section>
+
+  <section class="detail-grid">
+    <article class="panel card-panel">
+      <p class="panel-kicker">SOURCE</p>
+      <h3>Card used</h3>
+      @if (card) {
+        <div class="card-number-row"><div class="card-number">{{ maskedCardNumber(card.cardNumber) }}</div><button class="number-toggle" type="button" (click)="toggleCardNumber()" [attr.aria-label]="cardNumberRevealed ? 'Hide full card number' : 'Show full card number'">@if (cardNumberRevealed) { <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.9 10.9 0 0 1 12 4c5.5 0 9.4 5 10 8-.3 1.5-1.4 3.5-3.2 5.1M6.2 6.2C4.3 7.8 3.3 10 3 12c.6 3 4.5 8 9 8 1 0 1.9-.2 2.8-.5"/></svg> } @else { <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"/><circle cx="12" cy="12" r="2.8"/></svg> }</button></div>
+        <dl>
+          <div><dt>Cardholder</dt><dd>{{ card.cardHolderName || 'Cardholder' }}</dd></div>
+          <div><dt>Card status</dt><dd>{{ status(card) }}</dd></div>
+        </dl>
+        <button class="outline" (click)="nav('/cards/' + (card.creditId ?? card.id))">Open card details</button>
+      } @else { <p class="muted">Card record is unavailable.</p> }
+    </article>
+
+    <article class="panel merchant-panel" [class.self-panel]="isRepayment()">
+      <p class="panel-kicker">{{ isRepayment() ? 'PAYEE' : 'MERCHANT' }}</p>
+      @if (isRepayment()) {
+        <h3>Self</h3>
+        <p class="muted">Debt repayment to your credit-card account.</p>
+        <div class="self-note">This payment increases the shared available credit for this customer’s primary and add-on cards.</div>
+      } @else if (merchant) {
+        <h3>{{ name(merchant) }}</h3>
+        <dl>
+          <div><dt>Category</dt><dd>{{ merchant.merchantCategory || '-' }}</dd></div>
+          <div><dt>Bank</dt><dd>{{ merchant.bankName || '-' }}</dd></div>
+        </dl>
+        <button class="outline" (click)="nav('/merchants/' + (merchant.merchantId ?? merchant.id))">Open merchant details</button>
+      } @else {
+        <h3>{{ transaction.merchantName || 'Merchant' }}</h3>
+        <p class="muted">Merchant record is unavailable.</p>
+      }
+    </article>
+  </section>
+
+  @if (!isRepayment()) {
+    <section class="panel update">
+      <div>
+        <p class="panel-kicker">SETTLEMENT</p>
+        <h3>Update status</h3>
+        <p class="muted">Complete a transaction only after it is settled. Credit limits are checked again before completion.</p>
+      </div>
+      <div class="status-actions">
+        <button class="outline" (click)="update('COMPLETED')">Complete</button>
+        <button class="outline danger" (click)="update('FAILED')">Fail</button>
+        <button class="outline" (click)="update('CANCELLED')">Cancel</button>
+      </div>
+    </section>
+  }
+}

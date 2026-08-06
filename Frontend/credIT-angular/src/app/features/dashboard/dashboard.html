@@ -1,0 +1,75 @@
+<section class="page-heading dashboard-heading">
+    <div>
+        <p class="eyebrow">LIVE PORTFOLIO</p>
+        <h1>Credit card operations</h1>
+        <p>Live activity, card health, customer exposure, and actions in one place.</p>
+    </div>
+    <div class="heading-actions"><button class="secondary" (click)="openIssue()"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path></svg> Issue card</button><button class="primary" (click)="openTransaction()"><span class="plus">+</span> New
+            transaction</button></div>
+</section>
+@if(loading){<div class="dashboard-empty">Loading live data...</div>} @else { @if(error){<div class="error">{{error}}
+</div>}<section class="metric-grid">@for(metric of metrics;track metric.label){<article class="metric">
+        <div class="metric-icon" [class]="'metric-icon '+metric.tone"><ng-container [ngSwitch]="metric.icon"><svg *ngSwitchCase="'users'" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 20v-2a5 5 0 0 0-2-4"></path></svg><svg *ngSwitchCase="'card'" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path></svg><svg *ngSwitchCase="'arrow'" viewBox="0 0 24 24"><path d="m7 17 10-10M9 7h8v8"></path></svg><svg *ngSwitchDefault viewBox="0 0 24 24"><path d="M6 20v-7M12 20V4M18 20v-12"></path></svg></ng-container></div>
+        <p>{{metric.label}}</p>
+        <h2>{{metric.value}}</h2><small>{{metric.note}}</small>
+    </article>}</section>
+<section class="dashboard-grid dashboard-primary">
+    <article class="panel activity">
+        <div class="panel-title">
+            <div>
+                <h3>Transaction trend</h3>
+                <p>Latest recorded transaction amounts</p>
+            </div><span class="live-indicator">Live</span>
+        </div>@if(trend.length){<div class="portfolio-trend"><svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path class="trend-area" [attr.d]="trendAreaPath"></path><path class="trend-line" [attr.d]="trendPath"></path>@for(point of trend;track $index){
+                <circle [attr.cx]="point.x" [attr.cy]="point.y" r="2.5"></circle>}
+            </svg>
+            <div class="trend-labels">@for(point of trend;track $index){<span>{{point.label}}</span>}</div>
+        </div>}@else{<div class="dashboard-empty">No transaction activity yet.</div>}
+    </article>
+    <article class="panel status-overview">
+        <div class="panel-title">
+            <div>
+                <h3>Card status overview</h3>
+                <p>Open a status to review its cards.</p>
+            </div>
+        </div>
+        <div class="status-summary">@for(item of ['ACTIVE','INACTIVE','BLOCKED'];track item){<button
+                class="status-summary-row" [class]="'status-summary-row '+item.toLowerCase()"
+                (click)="nav('/cards/status/'+item)"><span>{{item}}</span><b>{{count(item)}}</b><small>View
+                    cards</small></button>}</div>
+    </article>
+</section>
+<section class="dashboard-grid">
+    <article class="panel attention">
+        <div class="panel-title">
+            <div>
+                <h3>Needs attention</h3>
+                <p>Blocked, inactive, expiring, or due cards</p>
+            </div><button class="link-button" (click)="nav('/cards/attention')">Review all</button>
+        </div>@if(attention.length){@for(card of attention;track id(card)){<button class="attention-row"
+            (click)="nav('/cards/'+id(card))"><span
+                [class]="status(card)==='BLOCKED'?'danger-dot':'warning-dot'"></span>
+            <div><b>{{holder(card)}}</b>
+                <p>{{lastSix(card)}} - {{reason(card)}}</p>
+            </div><span class="more">•••</span>
+        </button>}}@else{<div class="dashboard-empty">No cards need attention.</div>}
+    </article>
+    <article class="panel recent">
+        <div class="panel-title">
+            <div>
+                <h3>Recent transactions</h3>
+                <p>Latest activity across all cards</p>
+            </div><button class="link-button" (click)="nav('/transactions')">View all</button>
+        </div>@if(recent.length){<div class="transaction-list">@for(transaction of recent;track id(transaction)){<button
+                class="transaction-row" (click)="nav('/transactions/'+id(transaction))"><span class="transaction-icon"
+                    [class.payment]="type(transaction)==='PAYMENT'"
+                    [class.purchase]="type(transaction)!=='PAYMENT'">{{type(transaction)==='PAYMENT'?'↙':'↗'}}</span><span
+                    class="transaction-copy"><b>{{transaction.merchantName||transaction.title||'Unknown merchant'}}</b>
+                    <p>{{date(transaction.timestamp)}} {{id(transaction)}}</p>
+                </span><strong [class.income]="type(transaction)==='PAYMENT'"
+                    [class.expense]="type(transaction)!=='PAYMENT'">{{type(transaction)==='PAYMENT'?'+':''}}{{money(transaction.amount||transaction.transactionAmount)}}</strong></button>}
+        </div>}@else{<div class="dashboard-empty">No transactions yet.</div>}
+    </article>
+</section>}@if(issueOpen){<div class="modal-backdrop" (click)="closeIssue()"><form class="dashboard-dialog issue-dialog" (ngSubmit)="saveIssue()" (click)="$event.stopPropagation()"><button type="button" class="modal-close" (click)="closeIssue()">×</button><p class="eyebrow">MANAGEMENT</p><h2>Issue a credit card</h2><p class="dialog-copy">Fields match the CreditCards entity.</p>@if(dialogError){<div class="dialog-error">{{dialogError}}</div>}<div class="dialog-grid"><label>Customer ID<input name="customerId" [(ngModel)]="issue.customerId" (ngModelChange)="onIssueCustomerChange()" inputmode="numeric" required></label><label>Cardholder name<input name="cardHolderName" [(ngModel)]="issue.cardHolderName" required></label><label>Card name<select name="cardName" [(ngModel)]="issue.cardName"><option value="SILVER">Silver</option><option value="GOLD">Gold</option><option value="PLATINUM">Platinum</option><option value="ULTRA_PREMIUM">Ultra premium</option></select></label><label>Card type<select name="cardType" [(ngModel)]="issue.cardType"><option value="PRIMARY">Primary</option><option value="ADD_ON">Add-on</option></select></label><div class="limit-copy"><b>Credit limit</b><span>Assigned automatically from the selected card tier.</span></div><label>Expiry date<input name="expiryDate" type="date" [(ngModel)]="issue.expiryDate" required></label><label>Due date<input name="dueDate" type="date" [(ngModel)]="issue.dueDate" [max]="issue.expiryDate||null" required></label></div><div class="dialog-actions"><button class="secondary" type="button" (click)="closeIssue()">Cancel</button><button class="primary" type="submit">Save</button></div></form></div>}
+@if(transactionOpen){<div class="modal-backdrop" (click)="closeTransaction()"><form class="dashboard-dialog transaction-dialog" (ngSubmit)="saveTransaction()" (click)="$event.stopPropagation()"><button type="button" class="modal-close" (click)="closeTransaction()">×</button><p class="eyebrow">TRANSACTION</p><h2>Record purchase</h2><p class="dialog-copy">Fields match the Transactions entity.</p>@if(dialogError){<div class="dialog-error">{{dialogError}}</div>}<div class="dialog-grid"><label>Active card<select name="cardId" [(ngModel)]="purchase.cardId">@for(card of activeCards;track cardId(card)){<option [value]="cardId(card)">{{holder(card)}} - {{card.cardNumber}}</option>}</select></label><div class="limit-note"><span>{{selectedCard?.cardName||'Card'}} limit</span><b>{{money(limit(selectedCard))}}</b><span>Held</span><b>{{money(held(selectedCard))}}</b><span>Available</span><b>{{money(available(selectedCard))}}</b></div><label>Merchant<select name="merchantId" [(ngModel)]="purchase.merchantId">@for(merchant of activeMerchants;track merchantId(merchant)){<option [value]="merchantId(merchant)">{{merchantName(merchant)}}</option>}</select></label><label>Transaction type<select name="transactionType" [(ngModel)]="purchase.transactionType"><option>PURCHASE</option><option>REFUND</option><option>AUTHORIZATION</option><option>REVERSAL</option><option>CHARGEBACK</option></select></label><label>Amount<input name="amount" type="number" min="1" [(ngModel)]="purchase.amount" required></label><label>Payment method<select name="paymentMethod" [(ngModel)]="purchase.paymentMethod"><option>CHIP</option><option>SWIPE</option><option>CONTACTLESS</option><option>ONLINE</option><option>MOBILE_WALLET</option></select></label></div><div class="dialog-actions"><button class="secondary" type="button" (click)="closeTransaction()">Cancel</button><button class="primary purchase-save" type="submit">Save</button></div></form></div>}

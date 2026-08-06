@@ -1,0 +1,47 @@
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">MANAGEMENT</p>
+        <h1>Transactions</h1>
+        <p>Search, filter, and open a complete record for every transaction.</p>
+    </div><button class="primary" (click)="openPurchase()"><span>+</span> New transaction</button>
+</section>
+@if(notice){<div class="notice">{{notice}}</div>}@if(error){<div class="notice error">{{error}}</div>}<section class="filter-bar"><label class="page-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input [(ngModel)]="search" (ngModelChange)="resetPage()" placeholder="Search by card number, ID, or merchant"></label><label class="filter-select"><span>Transaction type</span><select [(ngModel)]="typeFilter" (ngModelChange)="resetPage()"><option value="ALL">All types</option><option>PURCHASE</option><option>REFUND</option><option>AUTHORIZATION</option><option>REVERSAL</option><option>CHARGEBACK</option><option>PAYMENT</option></select></label><label class="filter-select"><span>Status</span><select [(ngModel)]="statusFilter" (ngModelChange)="resetPage()"><option value="ALL">All statuses</option><option>PENDING</option><option>AUTHORIZED</option><option>COMPLETED</option><option>FAILED</option><option>CANCELLED</option></select></label><label class="filter-select"><span>Payment method</span><select [(ngModel)]="methodFilter" (ngModelChange)="resetPage()"><option value="ALL">All methods</option><option>CHIP</option><option>SWIPE</option><option>CONTACTLESS</option><option>ONLINE</option><option>MOBILE_WALLET</option></select></label></section>
+<section class="amount-range">
+    <div class="range-title">
+        <div><span>Amount range</span><b>Filter by transaction amount</b></div><strong>{{money(lower)}} -
+            {{money(upper)}}</strong>
+    </div>
+    <div class="range-single">
+        <div class="range-track"></div>
+        <div class="range-selected" [style.left.%]="lowerPct" [style.right.%]="100-upperPct"></div><span class="range-thumb" [style.left.%]="lowerPct"></span><span class="range-thumb" [style.left.%]="upperPct"></span><input
+            class="range-handle" type="range" [min]="floor" [max]="ceiling||1" [value]="lower"
+            (input)="onLower(+$any($event.target).value)"><input class="range-handle" type="range" [min]="floor"
+            [max]="ceiling||1" [value]="upper" (input)="onUpper(+$any($event.target).value)">
+    </div>
+    <div class="range-endpoints"><span>{{money(floor)}}</span><span>{{money(ceiling)}}</span></div>
+</section>
+<section class="panel table-panel">@if(loading){<div class="table-loading">Loading transactions...</div>}@else{<table>
+        <thead>
+            <tr>
+                <th>Transaction</th>
+                <th>Card</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Date and time</th>
+                <th>Status</th>
+                <th class="actions-heading">Actions</th>
+            </tr>
+        </thead>
+        <tbody>@for(transaction of pagedVisible;track id(transaction)){<tr (click)="nav('/transactions/'+id(transaction))">
+                <td><b>{{transaction.merchantName||'Card transaction'}}</b><small>ID: {{id(transaction)}}</small></td>
+                <td>{{number(transaction)}}</td>
+                <td><span class="type" [class.payment]="type(transaction)==='PAYMENT'">{{type(transaction)}}</span></td>
+                <td [class.income]="type(transaction)==='PAYMENT'" [class.expense]="type(transaction)!=='PAYMENT'">
+                    {{money(amount(transaction))}}</td>
+                <td>{{date(transaction.timestamp)}}</td>
+                <td><span class="status">{{status(transaction)}}</span></td>
+                <td class="action-cell"><button class="outline" (click)="$event.stopPropagation(); requestDelete(transaction)">Delete</button></td>
+            </tr>}@empty{<tr>
+                <td colspan="7" class="empty">No transactions match these filters.</td>
+            </tr>}</tbody>
+    </table>}</section><app-pagination [page]="page" [total]="visible.length" [pageSize]="pageSize" (pageChange)="page=$event"></app-pagination>@if(pendingDelete){<div class="modal-backdrop" (click)="pendingDelete=null"><section class="confirm-dialog" (click)="$event.stopPropagation()"><p class="eyebrow">CONFIRM ACTION</p><h2>Delete this transaction?</h2><p>This action cannot be undone. The transaction record will be permanently removed.</p><div class="dialog-actions"><button class="secondary" (click)="pendingDelete=null">Cancel</button><button class="primary delete" (click)="remove(pendingDelete)">Delete transaction</button></div></section></div>}@if(purchaseOpen){<div class="modal-backdrop" (click)="closePurchase()"><form class="purchase-dialog" (ngSubmit)="savePurchase()" (click)="$event.stopPropagation()"><button type="button" class="close" (click)="closePurchase()">×</button><p class="eyebrow">TRANSACTION</p><h2>Record purchase</h2><p class="dialog-subtitle">Fields match the Transactions entity.</p>@if(purchaseError){<div class="dialog-error">{{purchaseError}}</div>}<div class="purchase-grid"><label>Active card<select [(ngModel)]="purchase.cardId" name="cardId">@for(card of activeCards;track cardId(card)){<option [value]="cardId(card)">{{cardHolder(card)}} - {{number(card)}}</option>}</select></label><div class="limit-note"><span>{{selectedCard?.cardName||'Card'}} limit</span><b>{{money(limit(selectedCard))}}</b><span>Held</span><b>{{money(held(selectedCard))}}</b><span>Available</span><b>{{money(available(selectedCard))}}</b></div><label>Merchant<select [(ngModel)]="purchase.merchantId" name="merchantId">@for(merchant of activeMerchants;track merchantId(merchant)){<option [value]="merchantId(merchant)">{{merchantName(merchant)}}</option>}</select></label><label>Transaction type<select [(ngModel)]="purchase.transactionType" name="transactionType"><option>PURCHASE</option><option>REFUND</option><option>AUTHORIZATION</option><option>REVERSAL</option><option>CHARGEBACK</option></select></label><label>Amount<input [(ngModel)]="purchase.amount" name="amount" type="number" min="1" [max]="available(selectedCard)" required></label><label>Payment method<select [(ngModel)]="purchase.paymentMethod" name="paymentMethod"><option>CHIP</option><option>SWIPE</option><option>CONTACTLESS</option><option>ONLINE</option><option>MOBILE_WALLET</option></select></label></div><div class="dialog-actions"><button type="button" class="secondary" (click)="closePurchase()">Cancel</button><button class="primary purchase-save" type="submit">Save</button></div></form></div>}
