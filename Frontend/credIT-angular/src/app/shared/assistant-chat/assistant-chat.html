@@ -1,0 +1,36 @@
+<button class="assistant-launcher" type="button" (click)="toggle()" [attr.aria-expanded]="open" aria-label="Open Credence assistant"><svg viewBox="0 0 24 24"><path d="M12 3a8 8 0 0 0-8 8v3a4 4 0 0 0 4 4h1l3 3 3-3h1a4 4 0 0 0 4-4v-3a8 8 0 0 0-8-8Z"/><path d="M8.5 11h.01M15.5 11h.01"/></svg><span>AI assistant</span></button>
+@if(open){
+<section class="assistant-panel" aria-label="Credence AI assistant">
+  <header><div><span>CREDENCE AI</span><h2>Operations assistant</h2></div><button class="close" type="button" (click)="open=false" aria-label="Close">&times;</button></header>
+  <div class="assistant-body">
+    <aside class="history">
+      <button class="new-chat" type="button" (click)="newConversation()">+ New chat</button>
+      <p>PREVIOUS CHATS</p>
+      @for(chat of conversations;track chat.conversationId){
+      <div class="history-item">
+        <button type="button" [class.active]="chat.conversationId===conversationId" (click)="loadHistory(chat.conversationId)" [title]="chat.title">{{chat.title}}</button>
+        <button class="delete-chat" type="button" (click)="pendingDelete=chat.conversationId" aria-label="Delete this chat"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M9 7V4h6v3M6 7l1 14h10l1-14"/></svg></button>
+      </div>}
+      @if(pendingDelete){<div class="delete-confirm"><b>Delete this chat?</b><span>This cannot be undone.</span><div><button type="button" (click)="pendingDelete=''">Cancel</button><button class="danger" type="button" (click)="deleteConversation()">Delete</button></div></div>}
+    </aside>
+    <div class="thread">
+      @if(historyLoading){<p class="loading">Loading conversation...</p>}
+      @else if(messages.length===0){<div class="welcome"><b>How can I help?</b><span>Ask about cards, customers, transactions, repayments, renewals, or operations.</span></div>}
+      @for(message of messages;track message.id){
+      <article [class.user]="message.role==='user'" [class.bot]="message.role!=='user'">
+        <span>{{message.role==='user'?'You':'AI'}}</span>
+        <div class="message-content" [innerHTML]="message.role==='user' ? message.content : format(message.content)"></div>
+        @if(message.proposal){
+        <section class="action-proposal">
+          <b>Ready for confirmation</b><p>{{message.proposal.summary}}</p>
+          <small>{{message.proposal.operation.replaceAll('_',' ')}}</small>
+          <div><button class="confirm-action" type="button" [disabled]="actionRunning" (click)="executeProposal(message)">{{actionRunning?'Running…':'Confirm and run'}}</button><button type="button" [disabled]="actionRunning" (click)="dismissProposal(message)">Dismiss</button></div>
+        </section>}
+        @if(message.actionResult){<p class="action-result">{{message.actionResult}}</p>}
+      </article>}
+      @if(error){<p class="chat-error">{{error}}</p>}
+      @if(loading){<p class="typing">Assistant is thinking...</p>}
+    </div>
+  </div>
+  <form (ngSubmit)="send()"><textarea [(ngModel)]="draft" (keydown)="onKeydown($event)" name="assistantMessage" rows="2" maxlength="4000" placeholder="Ask Credence AI..." [disabled]="loading"></textarea><button class="send-icon" type="submit" [disabled]="loading||!draft.trim()" aria-label="Send message"><svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4zM11 13l5-5"/></svg></button></form>
+</section>}

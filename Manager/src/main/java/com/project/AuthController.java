@@ -32,6 +32,7 @@ public class AuthController {
     private final PasswordEncoder passwords;
     private final SecretKey key;
     private final long expirationMinutes;
+    private static final long REFRESH_EXPIRATION_DAYS = 7;
 
     public AuthController(ManagerRepository managers, PasswordEncoder passwords,
             @Value("${app.jwt.secret}") String secret,
@@ -74,7 +75,10 @@ public class AuthController {
         if (authorization == null || !authorization.startsWith("Bearer "))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "A valid session token is required."));
         try {
-            String username = Jwts.parser().verifyWith(key).build().parseSignedClaims(authorization.substring(7)).getPayload().getSubject();
+            var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(authorization.substring(7)).getPayload();
+            String tokenUse = claims.get("tokenUse", String.class);
+            if (tokenUse != null && !"refresh".equals(tokenUse)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "A refresh token is required."));
+            String username = claims.getSubject();
             return managers.findByUsername(username).filter(m -> m.getStatus() == STATUS.ACTIVE)
                     .<ResponseEntity<?>>map(m -> ResponseEntity.ok(tokenResponse(m)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Manager account is unavailable.")));
@@ -85,7 +89,11 @@ public class AuthController {
     private Map<String, Object> tokenResponse(Manager manager) {
         Instant expires = Instant.now().plus(expirationMinutes, ChronoUnit.MINUTES);
         String token = Jwts.builder().subject(manager.getUsername()).claim("role", manager.getRole()).issuedAt(java.util.Date.from(Instant.now())).expiration(java.util.Date.from(expires)).signWith(key).compact();
-        return Map.of("accessToken", token, "tokenType", "Bearer", "expiresAt", expires.toString(), "username", manager.getUsername(), "role", manager.getRole());
+        return Map.of("accessToken", token, "refreshToken", refreshToken(manager), "tokenType", "Bearer", "expiresAt", expires.toString(), "username", manager.getUsername(), "role", manager.getRole());
+    }
+    private String refreshToken(Manager manager) {
+        Instant expires = Instant.now().plus(REFRESH_EXPIRATION_DAYS, ChronoUnit.DAYS);
+        return Jwts.builder().subject(manager.getUsername()).claim("tokenUse", "refresh").issuedAt(java.util.Date.from(Instant.now())).expiration(java.util.Date.from(expires)).signWith(key).compact();
     }
     public record LoginRequest(String username, String password) {}
     public record RegisterRequest(String username, String password, String firstName, String lastName, Long phoneNumber, String address) {}

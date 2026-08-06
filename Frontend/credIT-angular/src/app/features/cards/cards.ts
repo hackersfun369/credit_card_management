@@ -6,7 +6,7 @@ import { CreditApi } from '../../core/credit-api';
 import { Pagination } from '../../shared/pagination/pagination';
 @Component({selector:'app-cards',standalone:true,imports:[CommonModule,FormsModule,Pagination],templateUrl:'./cards.html',styleUrl:'./cards.css'})
 export class Cards implements OnInit {
-  cards:any[]=[]; customers:any[]=[]; search=''; status=''; loading=true; issueOpen=false; issueError=''; notice=''; issue={customerId:'',cardHolderName:'',cardName:'SILVER',cardType:'PRIMARY',expiryDate:'',dueDate:''}; page=1; readonly pageSize=10;
+  cards:any[]=[]; customers:any[]=[]; search=''; status=''; loading=true; issueOpen=false; issueError=''; notice=''; pendingDelete:any=null; deleteError=''; deleteBusy=false; issue={customerId:'',cardHolderName:'',cardName:'SILVER',cardType:'PRIMARY',expiryDate:'',dueDate:''}; page=1; readonly pageSize=10;
   constructor(private api:CreditApi,private router:Router,private route:ActivatedRoute,private cdr:ChangeDetectorRef){}
   ngOnInit(){this.route.paramMap.subscribe(params=>{this.status=(params.get('status')||'').toUpperCase();this.load()})}
   async load(){this.loading=true;try{const [value, customerRows]=await Promise.all([this.api.request<any>('cards','/card'),this.api.request<any>('customers','/customer')]);this.cards=Array.isArray(value)?value:(value?.content||[]);this.customers=Array.isArray(customerRows)?customerRows:(customerRows?.content||[])}finally{this.loading=false;this.cdr.detectChanges()}}
@@ -14,6 +14,29 @@ export class Cards implements OnInit {
   get requiredTier(){return this.issueCustomerCards[0]?.cardName||''}
   onCustomerIdChange(){if(this.requiredTier)this.issue.cardName=String(this.requiredTier).toUpperCase()}  openIssue(){this.issueError='';this.issueOpen=true}
   closeIssue(){this.issueOpen=false;this.issueError=''}
+  requestDelete(card:any){this.pendingDelete=card;this.deleteError='';this.deleteBusy=false}
+  closeDelete(){if(this.deleteBusy)return;this.pendingDelete=null;this.deleteError=''}
+  async deleteCard(){
+    const card=this.pendingDelete;
+    if(!card||this.deleteBusy)return;
+    const cardId=this.id(card);
+    if(cardId===null||cardId===undefined){this.deleteError='This card does not have a valid identifier.';return}
+    this.deleteBusy=true;this.deleteError='';
+    try{
+      await this.api.request('cards','/card/'+cardId,{method:'DELETE'});
+      this.pendingDelete=null;
+      this.notice='Credit card deleted.';
+      await this.load();
+      const lastPage=Math.max(1,Math.ceil(this.visible.length/this.pageSize));
+      if(this.page>lastPage)this.page=lastPage;
+      window.setTimeout(()=>{this.notice='';this.cdr.detectChanges()},3000);
+    }catch(error:any){
+      this.deleteError=error?.message||'Unable to delete this card.';
+    }finally{
+      this.deleteBusy=false;
+      this.cdr.detectChanges();
+    }
+  }
   async saveIssue(){
     const customerId=Number(this.issue.customerId);
     if(!customerId||!this.issue.cardHolderName.trim()){this.issueError='Customer ID and cardholder name are required.';return}

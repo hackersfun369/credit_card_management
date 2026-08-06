@@ -43,13 +43,22 @@ public class CustomerService {
     }
 
 public Customer addCustomer(Customer cust) {
+        if (cust.getAccountNumber() == null) cust.setAccountNumber(generateAccountNumber());
         validateCustomer(cust);
         ensureUnique(cust, null);
         if (cust.getCreatedDate() == null) cust.setCreatedDate(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
         return cr.save(cust);
 	    }
 	 
-	 public Customer getCustomerById(Integer id) {
+	    private Long generateAccountNumber() {
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        Long accountNumber;
+        do {
+            accountNumber = random.nextLong(100_000_000_000L, 1_000_000_000_000L);
+        } while (cr.existsByAccountNumber(accountNumber));
+        return accountNumber;
+    }
+ public Customer getCustomerById(Integer id) {
 	        return cr.findById(id).orElse(null);
 	    }
 	 
