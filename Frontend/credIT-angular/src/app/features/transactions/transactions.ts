@@ -51,14 +51,10 @@ export class Transactions implements OnInit {
   async load() {
     this.loading = true;
     try {
-      const [transactions, cards, merchants] = await Promise.all([
-        this.api.request<any>('transactions', '/transactions'),
-        this.api.request<any>('cards', '/card'),
-        this.api.request<any>('merchants', '/merchants'),
-      ]);
-      this.transactions = Array.isArray(transactions) ? transactions : transactions?.content || [];
-      this.cards = Array.isArray(cards) ? cards : cards?.content || [];
-      this.merchants = Array.isArray(merchants) ? merchants : merchants?.content || [];
+      const data: any = await this.api.request('auth', '/api/manager-portal/dashboard');
+      this.transactions = Array.isArray(data.transactions) ? data.transactions : data.transactions?.content || [];
+      this.cards = Array.isArray(data.cards) ? data.cards : data.cards?.content || [];
+      this.merchants = Array.isArray(data.merchants) ? data.merchants : data.merchants?.content || [];
       const firstActive = this.activeCards[0];
       if (!this.purchase.cardId && firstActive)
         this.purchase.cardId = String(this.cardId(firstActive));
@@ -275,3 +271,5 @@ export class Transactions implements OnInit {
       : ((this.upper - this.floor) / (this.ceiling - this.floor)) * 100;
   }
 }
+
+

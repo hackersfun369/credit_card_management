@@ -20,12 +20,12 @@ export class Customers implements OnInit {
     if(!/^\d{10}$/.test(String(item.phoneNumber))) { this.registerError='Phone number must contain exactly 10 digits.'; return; }
     if(!/^\d{12}$/.test(String(item.aadharNumber))) { this.registerError='Aadhaar number must contain exactly 12 digits.'; return; }
     try {
-      await this.api.request('customers','/customer',{ method:'POST', body:JSON.stringify({...item, phoneNumber:Number(item.phoneNumber), aadharNumber:Number(item.aadharNumber), accountNumber:Number(item.accountNumber)}) });
+      await this.api.request('auth','/api/manager-portal/customers',{ method:'POST', body:JSON.stringify({...item, phoneNumber:Number(item.phoneNumber), aadharNumber:Number(item.aadharNumber), accountNumber:Number(item.accountNumber)}) });
       this.closeRegister(); await this.load();
     } catch(error:any) { this.registerError=error?.message||'Unable to register customer.'; }
     finally { this.cdr.detectChanges(); }
   }
-  async load(){ this.loading=true; try { const [customers,cards]=await Promise.all([this.api.request<any>('customers','/customer'),this.api.request<any>('cards','/card')]); this.customers=this.rows(customers); this.cards=this.rows(cards); } finally { this.loading=false; this.cdr.detectChanges(); } }
+  async load(){ this.loading=true; try { const data:any=await this.api.request('auth','/api/manager-portal/dashboard'); this.customers=this.rows(data.customers); this.cards=this.rows(data.cards); } finally { this.loading=false; this.cdr.detectChanges(); } }
   rows(value:any){ return Array.isArray(value)?value:(value?.content||[]); }
   id(c:any){ return c?.custId??c?.customerId??c?.id; }
   name(c:any){ return [c?.custFirstName??c?.firstName,c?.custLastName??c?.lastName].filter(Boolean).join(' ')||'Unknown customer'; }

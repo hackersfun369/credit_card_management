@@ -33,9 +33,52 @@ export class AssistantChat implements OnInit,OnDestroy {
   messages:ChatMessage[]=[];
   conversations:Conversation[]=[];
   conversationId=this.newId();
+  launcherPosition?:{left:number;top:number};
+  panelPosition?:{left:number;top:number};
+  private drag?:{target:'launcher'|'panel';offsetX:number;offsetY:number;width:number;height:number;moved:boolean};
+  private suppressLauncherClick=false;
 
   async ngOnInit(){await this.loadConversations();}
-  ngOnDestroy(){if(this.wordTimer)window.clearTimeout(this.wordTimer);}
+  ngOnDestroy(){if(this.wordTimer)window.clearTimeout(this.wordTimer);this.stopDrag();}
+
+  launcherClick(){
+    if(this.suppressLauncherClick){this.suppressLauncherClick=false;return;}
+    void this.toggle();
+  }
+
+  startDrag(event:PointerEvent,target:'launcher'|'panel'){
+    if(event.button!==0)return;
+    const source=event.currentTarget as HTMLElement;
+    const movable=target==='panel' ? source.closest('.assistant-panel') as HTMLElement : source;
+    if(!movable)return;
+    const rect=movable.getBoundingClientRect();
+    this.drag={target,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top,width:rect.width,height:rect.height,moved:false};
+    window.addEventListener('pointermove',this.onDragMove);
+    window.addEventListener('pointerup',this.onDragEnd,{once:true});
+    event.preventDefault();
+  }
+
+  private onDragMove=(event:PointerEvent)=>{
+    if(!this.drag)return;
+    const position={
+      left:Math.max(8,Math.min(window.innerWidth-this.drag.width-8,event.clientX-this.drag.offsetX)),
+      top:Math.max(8,Math.min(window.innerHeight-this.drag.height-8,event.clientY-this.drag.offsetY))
+    };
+    this.drag.moved=true;
+    if(this.drag.target==='panel')this.panelPosition=position;else this.launcherPosition=position;
+    this.cdr.detectChanges();
+  };
+
+  private onDragEnd=()=>{
+    if(this.drag?.target==='launcher'&&this.drag.moved)this.suppressLauncherClick=true;
+    this.stopDrag();
+  };
+
+  private stopDrag(){
+    window.removeEventListener('pointermove',this.onDragMove);
+    window.removeEventListener('pointerup',this.onDragEnd);
+    this.drag=undefined;
+  }
 
   async toggle(){
     this.open=!this.open;
@@ -182,3 +225,5 @@ export class AssistantChat implements OnInit,OnDestroy {
   onKeydown(event:KeyboardEvent){if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();void this.send();}}
   private newId(){return typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'chat-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
 }
+
+

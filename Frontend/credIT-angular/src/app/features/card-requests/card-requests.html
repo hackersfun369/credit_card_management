@@ -1,0 +1,44 @@
+<section class="page-heading">
+  <div><p class="eyebrow">MANAGEMENT</p><h1>Card requests</h1><p>Review credit-card requests from customers assigned to you.</p></div>
+  <button class="secondary refresh" (click)="load()">Refresh</button>
+</section>
+
+@if(error){<div class="notice error">{{error}}</div>}
+<section class="request-summary">
+  <article><span>Pending</span><b>{{count('PENDING')}}</b></article>
+  <article><span>On hold</span><b>{{count('ON_HOLD')}}</b></article>
+  <article><span>Approved</span><b>{{count('APPROVED')}}</b></article>
+  <article><span>Rejected</span><b>{{count('REJECTED')}}</b></article>
+</section>
+
+<section class="filters">
+  <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input [(ngModel)]="search" (ngModelChange)="resetPage()" placeholder="Search customer, ID, tier, or card type"></label>
+  <select [(ngModel)]="statusFilter" (ngModelChange)="resetPage()"><option>ALL</option><option>PENDING</option><option>ON_HOLD</option><option>APPROVED</option><option>REJECTED</option></select>
+</section>
+
+@if(loading){<div class="state">Loading card requests...</div>}@else{
+<section class="request-table">
+  <div class="table-head columns"><span>Customer</span><span>Request</span><span>Card</span><span>Status</span><span>Message</span><span>Actions</span></div>
+  @for(request of paged;track request.id){
+    <div class="table-row columns" role="button" tabindex="0" (click)="openCustomer(request)" (keydown.enter)="openCustomer(request)">
+      <div><b>{{customerName(request)}}</b><small>Customer #{{request.customerId}}</small></div>
+      <div><b>#{{request.id}}</b><small>Open customer details</small></div>
+      <div><b>{{request.cardName}}</b><small>{{request.cardType}}</small></div>
+      <span [class]="'status '+status(request).toLowerCase().replace('_','-')">{{status(request).replace('_',' ')}}</span>
+      <span class="note">{{request.note || 'No message provided'}}</span>
+      <div class="actions">
+        @if(status(request)==='PENDING'||status(request)==='ON_HOLD'){
+          <button class="secondary hold" [disabled]="status(request)==='ON_HOLD'" (click)="decide(request,'ON_HOLD',$event)">Hold</button>
+          <button class="secondary reject" (click)="decide(request,'REJECTED',$event)">Reject</button>
+          <button class="primary" (click)="openApproval(request,$event)">Approve</button>
+        }@else{<span class="decision-complete">Reviewed</span>}
+      </div>
+    </div>
+  }@empty{<div class="state">No card requests match these filters.</div>}
+</section>
+@if(visible.length>pageSize){<app-pagination [page]="page" [pageSize]="pageSize" [total]="visible.length" (pageChange)="page=$event" />}
+}
+
+@if(approvalTarget){<div class="modal-backdrop" (click)="closeApproval()"><form class="approval-dialog" (ngSubmit)="decide(approvalTarget,'APPROVED')" (click)="$event.stopPropagation()"><button type="button" class="close" (click)="closeApproval()"><svg class="dialog-close-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button><p class="eyebrow">CARD REQUEST</p><h2>Approve and issue card</h2><p>{{customerName(approvalTarget)}} · {{approvalTarget.cardName}} - {{approvalTarget.cardType}}</p>@if(dialogError){<div class="notice error">{{dialogError}}</div>}<div class="form-grid"><label>Expiry date<input type="date" name="expiry" [(ngModel)]="approval.expiryDate" required></label><label>Due date<input type="date" name="due" [(ngModel)]="approval.dueDate" [max]="approval.expiryDate||null" required></label></div><div class="dialog-actions"><button type="button" class="secondary" (click)="closeApproval()">Cancel</button><button class="primary" type="submit">Approve & issue</button></div></form></div>}
+
+

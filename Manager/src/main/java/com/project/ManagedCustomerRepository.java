@@ -1,0 +1,1 @@
+package com.project; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface ManagedCustomerRepository extends JpaRepository<ManagedCustomer,Long>{Optional<ManagedCustomer> findByCustomerId(Integer id);List<ManagedCustomer> findByManagerUsername(String username);}

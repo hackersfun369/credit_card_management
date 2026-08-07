@@ -42,12 +42,14 @@ public class CustomerPortalController {
   private static final Set<String> PAYMENT_METHODS = Set.of("CHIP", "SWIPE", "CONTACTLESS", "ONLINE", "MOBILE_WALLET");
   private final ObjectMapper json;
   private final CardRequestRepository requests;
+  private final ManagedCustomerRepository owners;
   private final SecretKey key;
   private final HttpClient http = HttpClient.newHttpClient();
 
-  public CustomerPortalController(ObjectMapper json, CardRequestRepository requests, @Value("${app.jwt.secret}") String secret) {
+  public CustomerPortalController(ObjectMapper json, CardRequestRepository requests, ManagedCustomerRepository owners, @Value("${app.jwt.secret}") String secret) {
     this.json = json;
     this.requests = requests;
+    this.owners = owners;
     this.key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
   }
 
@@ -147,7 +149,7 @@ public class CustomerPortalController {
     String type = type(input.cardType());
     if (tier == null || type == null) return ResponseEntity.badRequest().body(Map.of("message", "Choose a valid card tier and card type."));
     List<Map<String, Object>> currentCards = cards(customerId, auth).stream().filter(card -> card.get("replacedByCreditId") == null).toList();
-    List<CardRequest> pending = requests.findByCustomerIdOrderByIdDesc(customerId).stream().filter(item -> "PENDING".equalsIgnoreCase(item.getStatus())).toList();
+    List<CardRequest> pending = requests.findByCustomerIdOrderByIdDesc(customerId).stream().filter(item -> Set.of("PENDING", "ON_HOLD").contains(item.getStatus().toUpperCase())).toList();
     if (currentCards.size() + pending.size() >= 2) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "You can have a maximum of 2 cards. A new card cannot be requested."));
     boolean typeExists = currentCards.stream().anyMatch(card -> type.equalsIgnoreCase(String.valueOf(card.get("cardType")))) || pending.stream().anyMatch(item -> type.equalsIgnoreCase(item.getCardType()));
     if (typeExists) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", type.replace("_", "-") + " card already exists or is awaiting approval. Request the other card type."));
@@ -157,6 +159,7 @@ public class CustomerPortalController {
     request.setCardName(tier);
     request.setCardType(type);
     request.setNote(input.note());
+    request.setManagerUsername(owners.findByCustomerId(customerId).orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Your account is not assigned to a manager.")).getManagerUsername());
     requests.save(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(request);
   }
@@ -238,3 +241,4 @@ public class CustomerPortalController {
   public record RenewInput(LocalDate expiryDate, LocalDate dueDate) { }
   public record CustomerTransactionInput(Integer cardId, Long merchantId, String transactionType, java.math.BigDecimal amount, String paymentMethod) { }
 }
+

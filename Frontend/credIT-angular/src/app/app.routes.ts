@@ -13,6 +13,7 @@ import { Attention } from './features/attention/attention';
 import { Auth } from './features/auth/auth';
 import { RefreshView } from './shared/refresh-view/refresh-view';
 import { CustomerPortal } from './features/customer-portal/customer-portal';
+import { CardRequests } from './features/card-requests/card-requests';
 
 export const routes: Routes = [
   { path: 'login', component: Auth },
@@ -37,6 +38,7 @@ export const routes: Routes = [
       { path: 'cards/status/:status', component: Cards, canActivate: [managerGuard] },
       { path: 'cards/:id', component: CardDetail, canActivate: [managerGuard] },
       { path: 'customers', component: Customers, canActivate: [managerGuard] },
+      { path: 'card-requests', component: CardRequests, canActivate: [managerGuard] },
       { path: 'customers/:id', component: CustomerDetail, canActivate: [managerGuard] },
       { path: 'merchants', component: Merchants, canActivate: [managerGuard] },
       { path: 'merchants/:id', component: MerchantDetail, canActivate: [managerGuard] },

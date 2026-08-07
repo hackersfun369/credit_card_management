@@ -1,1 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");*{box-sizing:border-box}body{margin:0;background:#f7f8fc;color:#17213a;font-family:"DM Sans",sans-serif}button,input,select{font:inherit}
+/* Consistent controls and icons shared by every feature page. */
+select:not([multiple]){appearance:none;-webkit-appearance:none;min-height:42px;padding:0 42px 0 13px!important;border:1px solid #d9dfeb!important;border-radius:10px!important;background-color:#fff!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%234b5871' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 13px center!important;background-size:16px!important;color:#26334d!important;font-weight:600;cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
+select:not([multiple]):hover{border-color:#a9b3c7!important}
+select:not([multiple]):focus{outline:0;border-color:#6b5ce7!important;box-shadow:0 0 0 3px #6558e81c!important}
+select:not([multiple]):disabled{cursor:not-allowed;color:#8b96aa!important;background-color:#f5f6f9!important;opacity:1}
+select option{background:#fff;color:#26334d;font-weight:500}
+.dialog-close-icon{display:block;width:18px!important;height:18px!important;fill:none!important;stroke:currentColor!important;stroke-width:2!important;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.card-brand-icon{display:block;width:21px!important;height:21px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;stroke-linecap:round;stroke-linejoin:round}

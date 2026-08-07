@@ -9,7 +9,7 @@ export class Cards implements OnInit {
   cards:any[]=[]; customers:any[]=[]; search=''; status=''; loading=true; issueOpen=false; issueError=''; notice=''; pendingDelete:any=null; deleteError=''; deleteBusy=false; issue={customerId:'',cardHolderName:'',cardName:'SILVER',cardType:'PRIMARY',expiryDate:'',dueDate:''}; page=1; readonly pageSize=10;
   constructor(private api:CreditApi,private router:Router,private route:ActivatedRoute,private cdr:ChangeDetectorRef){}
   ngOnInit(){this.route.paramMap.subscribe(params=>{this.status=(params.get('status')||'').toUpperCase();this.load()})}
-  async load(){this.loading=true;try{const [value, customerRows]=await Promise.all([this.api.request<any>('cards','/card'),this.api.request<any>('customers','/customer')]);this.cards=Array.isArray(value)?value:(value?.content||[]);this.customers=Array.isArray(customerRows)?customerRows:(customerRows?.content||[])}finally{this.loading=false;this.cdr.detectChanges()}}
+  async load(){this.loading=true;try{const data:any=await this.api.request('auth','/api/manager-portal/dashboard');this.cards=Array.isArray(data.cards)?data.cards:(data.cards?.content||[]);this.customers=Array.isArray(data.customers)?data.customers:(data.customers?.content||[])}finally{this.loading=false;this.cdr.detectChanges()}}
   get issueCustomerCards(){return this.cards.filter(card=>String(card?.customerId??card?.custId??'')===String(this.issue.customerId))}
   get requiredTier(){return this.issueCustomerCards[0]?.cardName||''}
   onCustomerIdChange(){if(this.requiredTier)this.issue.cardName=String(this.requiredTier).toUpperCase()}  openIssue(){this.issueError='';this.issueOpen=true}

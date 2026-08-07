@@ -27,7 +27,7 @@ public class SecurityConfig {
       .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(a -> a
         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-        .requestMatchers("/error", "/api/auth/**", "/api/customer-portal/**").permitAll()
+        .requestMatchers("/error", "/api/auth/**", "/api/customer-portal/**", "/api/manager-portal/**").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/assistant/actions/execute").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/assistant/chat").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/assistant/chat/stream").permitAll()
@@ -51,4 +51,5 @@ public class SecurityConfig {
     return s;
   }
 }
+
 

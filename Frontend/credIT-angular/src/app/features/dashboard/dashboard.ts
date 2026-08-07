@@ -17,6 +17,10 @@ export class Dashboard implements OnInit {
   cards: any[] = [];
   transactions: any[] = [];
   merchants: any[] = [];
+  cardRequests: any[] = [];
+  approvalOpen = false;
+  approvalTarget: any = null;
+  approval = { expiryDate: '', dueDate: '' };
   issueOpen = false;
   transactionOpen = false;
   dialogError = '';
@@ -36,11 +40,12 @@ export class Dashboard implements OnInit {
     this.loading = true;
     this.error = '';
     try {
-      const [customers, cards, merchants, transactions] = await this.api.loadAll();
-      this.customers = this.rows(customers);
-      this.cards = this.rows(cards);
-      this.merchants = this.rows(merchants);
-      this.transactions = this.rows(transactions);
+      const data: any = await this.api.request('auth', '/api/manager-portal/dashboard');
+      this.customers = this.rows(data.customers);
+      this.cards = this.rows(data.cards);
+      this.merchants = this.rows(data.merchants);
+      this.transactions = this.rows(data.transactions);
+      this.cardRequests = this.rows(data.cardRequests);
     } catch (error: any) {
       this.error = 'Unable to reach the services: ' + (error.message || 'Unknown error');
     } finally {
@@ -91,7 +96,20 @@ export class Dashboard implements OnInit {
       this.closeTransaction(); await this.refresh();
     } catch (error: any) { this.dialogError = error?.message || 'Unable to record this transaction.'; }
     finally { this.cdr.detectChanges(); }
-  }  nav(path: string) {
+  }  customerForRequest(request: any) { return this.customers.find(c => String(c?.custId ?? c?.customerId ?? c?.id) === String(request?.customerId)); }
+  requestCustomerName(request: any) { const c = this.customerForRequest(request); return c ? this.nameOfCustomer(c) : `Customer #${request?.customerId}`; }
+  nameOfCustomer(c: any) { return [c?.firstName ?? c?.custFirstName, c?.lastName ?? c?.custLastName].filter(Boolean).join(' ') || 'Customer'; }
+  openApproval(request: any) { this.approvalTarget = request; this.approval = { expiryDate: '', dueDate: '' }; this.dialogError = ''; this.approvalOpen = true; }
+  closeApproval() { this.approvalOpen = false; this.approvalTarget = null; this.dialogError = ''; }
+  async decideRequest(request: any, status: 'APPROVED'|'REJECTED'|'ON_HOLD') {
+    this.dialogError = '';
+    if (status === 'APPROVED' && (!this.approval.expiryDate || !this.approval.dueDate || new Date(this.approval.dueDate) >= new Date(this.approval.expiryDate))) { this.dialogError = 'Choose a due date before the expiry date.'; return; }
+    try { await this.api.request('auth', `/api/manager-portal/card-requests/${request.id}`, { method: 'PATCH', body: JSON.stringify({ status, ...(status === 'APPROVED' ? this.approval : {}) }) }); if (status === 'APPROVED') this.closeApproval(); await this.refresh(); }
+    catch (error: any) { this.dialogError = error?.message || 'Unable to update this request.'; }
+    finally { this.cdr.detectChanges(); }
+  }
+  get openCardRequests() { return this.cardRequests.filter(r => ['PENDING','ON_HOLD'].includes(String(r?.status).toUpperCase())); }
+  nav(path: string) {
     this.router.navigateByUrl(path);
   }
   money(value: any) {
@@ -240,3 +258,5 @@ export class Dashboard implements OnInit {
       .slice(0, 5);
   }
 }
+
+

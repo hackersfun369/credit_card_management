@@ -38,6 +38,7 @@ export class Shell {
     if (path.startsWith('/cards')) return 'Cards';
     if (/^\/customers\/\d+$/.test(path)) return 'Customer details';
     if (path.startsWith('/customers')) return 'Customers';
+    if (path.startsWith('/card-requests')) return 'Card requests';
     if (/^\/merchants\/\d+$/.test(path)) return 'Merchant details';
     if (path.startsWith('/merchants')) return 'Merchants';
     if (/^\/transactions\/\d+$/.test(path)) return 'Transaction details';
